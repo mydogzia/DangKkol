@@ -17,25 +17,28 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
 
-    - name: Setup Gradle
+    - name: Setup Gradle 8.5
       uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.5'
 
-    - name: Build APK with Gradle
+    - name: Accept Android Licenses
+      run: |
+        yes | sdkmanager --licenses || true
+
+    - name: Build APK with Gradle 8.5
       run: |
         TARGET_DIR=$(find . -type d -name "android" | head -n 1)
-        echo "안드로이드 폴더 발견: $TARGET_DIR"
+        echo "안드로이드 폴더: $TARGET_DIR"
         cd "$TARGET_DIR"
-        if [ ! -f gradlew ]; then
-          gradle wrapper
-        fi
-        chmod +x gradlew || true
-        ./gradlew assembleDebug --stacktrace
+        gradle wrapper --gradle-version 8.5 --distribution-type bin
+        chmod +x gradlew
+        ./gradlew assembleDebug --stacktrace --no-daemon
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: 전국당꼴-debug-apk
-        path: "**/app-debug.apk"
+        path: "**/build/outputs/apk/debug/*.apk"
         retention-days: 30
