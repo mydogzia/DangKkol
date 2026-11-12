@@ -49,13 +49,13 @@
       <div id="search-results" class="search-results hidden"></div>
     </div>
 
-    <!-- 구글맵 API 키 알림 배너 (키 없을 때 상단 안내) -->
+    <!-- 네이버 지도 연동 배너 -->
     <div id="api-key-banner" class="api-key-banner">
       <div class="banner-content">
-        <i class="fa-brands fa-google text-yellow-400"></i>
-        <span>구글맵 연동 모드: <strong>클릭하여 당구장 선택 & 꼴찌 등록</strong></span>
+        <i class="fa-solid fa-map-location-dot text-emerald-400"></i>
+        <span>네이버 지도 연동 모드: <strong>클릭하여 당구장 선택 & 꼴찌 등록</strong></span>
       </div>
-      <button id="btn-banner-settings" class="banner-btn">API 설정</button>
+      <button id="btn-banner-settings" class="banner-btn">지도 설정</button>
     </div>
 
     <!-- 메인 컨텐츠 영역 -->
@@ -333,17 +333,17 @@
         </div>
         <div class="modal-body">
           <div class="form-group">
-            <label for="setting-gmap-key">
-              <i class="fa-brands fa-google"></i> Google Maps API Key
+            <label for="setting-naver-key">
+              <i class="fa-solid fa-map-marked-alt text-emerald-400"></i> 네이버 지도 Client ID
             </label>
-            <input type="text" id="setting-gmap-key" placeholder="AIzaSy... 형식의 API 키 입력">
+            <input type="text" id="setting-naver-key" value="shr1k32iat" placeholder="네이버 클라우드 Client ID 입력">
             <p class="input-helper">
-              * 키가 없어도 현재 자체 고화질 지도 및 당구장 등록 기능이 100% 정상 작동합니다.<br>
-              * 실시간 구글 공식 지도 및 구글 장소 검색을 원하시면 API Key를 입력 후 저장하세요.
+              * 네이버 클라우드 플랫폼에서 발급받은 Client ID를 입력하세요.<br>
+              * 키가 없어도 기본 고화질 지도로 100% 정상 작동합니다.
             </p>
           </div>
           <div class="form-group">
-            <button id="btn-save-gmap-key" class="btn-submit w-full">API 키 적용 & 지도 새로고침</button>
+            <button id="btn-save-naver-key" class="btn-submit w-full">네이버 지도 적용하기</button>
           </div>
 
           <hr class="modal-divider">

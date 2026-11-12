@@ -10,9 +10,12 @@
   const STORAGE_KEYS = {
     STORES: 'dangkkol_stores_v1',
     RECORDS: 'dangkkol_records_v1',
+    NAVER_KEY: 'dangkkol_naver_key_v1',
     GMAP_KEY: 'dangkkol_gmap_key_v1',
     PLAYERS: 'dangkkol_players_v1'
   };
+
+  const DEFAULT_NAVER_CLIENT_ID = 'shr1k32iat';
 
   // 기본 샘플 당구장 목록 (서울/수도권 및 범용 샘플)
   const DEFAULT_STORES = [
@@ -41,6 +44,8 @@
   let userLocation = { lat: 37.498095, lng: 127.027610 }; // 기본값 (강남역 부근)
   let googleMapInstance = null;
   let isGoogleMapActive = false;
+  let naverMapInstance = null;
+  let isNaverMapActive = false;
 
   // DOM Elements
   const elMap = document.getElementById('map');
@@ -97,8 +102,14 @@
       const storedRecords = localStorage.getItem(STORAGE_KEYS.RECORDS);
       records = storedRecords ? JSON.parse(storedRecords) : [...DEFAULT_RECORDS];
 
+      const savedNaverKey = localStorage.getItem(STORAGE_KEYS.NAVER_KEY) || DEFAULT_NAVER_CLIENT_ID;
+      const elSettingNaverKey = document.getElementById('setting-naver-key');
+      if (savedNaverKey && elSettingNaverKey) {
+        elSettingNaverKey.value = savedNaverKey;
+      }
+
       const savedGmapKey = localStorage.getItem(STORAGE_KEYS.GMAP_KEY);
-      if (savedGmapKey) {
+      if (savedGmapKey && elSettingGmapApiKey) {
         elSettingGmapApiKey.value = savedGmapKey;
       }
     } catch (e) {
@@ -126,15 +137,90 @@
     }, 2800);
   }
 
-  // --- 지도 초기화 (Google Maps or 고화질 모바일 지도) ---
+  // --- 지도 초기화 (네이버 지도 기본 연동) ---
   function initMap() {
+    const naverKey = localStorage.getItem(STORAGE_KEYS.NAVER_KEY) || DEFAULT_NAVER_CLIENT_ID;
     const gmapKey = localStorage.getItem(STORAGE_KEYS.GMAP_KEY);
 
-    if (gmapKey && gmapKey.trim().length > 15) {
+    if (naverKey && naverKey.trim().length > 3) {
+      loadNaverMapsAPI(naverKey.trim());
+    } else if (gmapKey && gmapKey.trim().length > 15) {
       loadGoogleMapsAPI(gmapKey.trim());
     } else {
       loadLeafletMap();
     }
+  }
+
+  // 1. Naver Maps JS API v3 동적 로더
+  function loadNaverMapsAPI(clientId) {
+    if (window.naver && window.naver.maps) {
+      renderNaverMap();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${clientId}&submodules=geocoder`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      renderNaverMap();
+      showToast('네이버 지도가 성공적으로 연결되었습니다!', '🗺️');
+    };
+    script.onerror = () => {
+      console.warn('네이버 지도 API 로드 실패, 대체 지도로 전환합니다.');
+      showToast('네이버 지도 연결 실패 (Client ID를 확인하세요)', '⚠️');
+      loadLeafletMap();
+    };
+    document.head.appendChild(script);
+  }
+
+  function renderNaverMap() {
+    isNaverMapActive = true;
+    isGoogleMapActive = false;
+    elMap.innerHTML = '';
+
+    const mapOptions = {
+      center: new naver.maps.LatLng(userLocation.lat, userLocation.lng),
+      zoom: 16,
+      zoomControl: false,
+      mapTypeControl: false,
+      scaleControl: false
+    };
+    naverMapInstance = new naver.maps.Map('map', mapOptions);
+
+    naver.maps.Event.addListener(naverMapInstance, 'click', (e) => {
+      openAddStoreModalWithCoords(e.coord.lat(), e.coord.lng());
+    });
+
+    renderNaverMarkers();
+  }
+
+  function renderNaverMarkers() {
+    if (!naverMapInstance) return;
+    mapMarkers.forEach(m => m.setMap(null));
+    mapMarkers = [];
+
+    stores.forEach(store => {
+      const isSelected = selectedStore && selectedStore.id === store.id;
+      const marker = new naver.maps.Marker({
+        position: new naver.maps.LatLng(store.lat, store.lng),
+        map: naverMapInstance,
+        title: store.name,
+        icon: {
+          content: `
+            <div style="position:relative; cursor:pointer;">
+              <div class="billiard-marker ${isSelected ? 'selected' : ''}">🎱</div>
+              <div class="billiard-marker-label">${escapeHtml(store.name)}</div>
+            </div>
+          `,
+          anchor: new naver.maps.Point(19, 19)
+        }
+      });
+
+      naver.maps.Event.addListener(marker, 'click', () => {
+        selectStore(store);
+      });
+      mapMarkers.push(marker);
+    });
   }
 
   // 1. Google Maps JS API 동적 로더
@@ -317,7 +403,10 @@
     elBottomSheet.classList.remove('collapsed');
 
     // 지도 중심 이동
-    if (isGoogleMapActive && googleMapInstance) {
+    if (isNaverMapActive && naverMapInstance) {
+      naverMapInstance.panTo(new naver.maps.LatLng(store.lat, store.lng));
+      renderNaverMarkers();
+    } else if (isGoogleMapActive && googleMapInstance) {
       googleMapInstance.panTo({ lat: store.lat, lng: store.lng });
     } else if (currentMap) {
       currentMap.panTo([store.lat, store.lng], { animate: true });
@@ -350,7 +439,10 @@
   }
 
   function moveToCurrentLocation() {
-    if (isGoogleMapActive && googleMapInstance) {
+    if (isNaverMapActive && naverMapInstance) {
+      naverMapInstance.setCenter(new naver.maps.LatLng(userLocation.lat, userLocation.lng));
+      naverMapInstance.setZoom(16);
+    } else if (isGoogleMapActive && googleMapInstance) {
       googleMapInstance.setCenter(userLocation);
       googleMapInstance.setZoom(15);
     } else if (currentMap) {
@@ -709,7 +801,8 @@
       saveStores();
       closeAddStoreModal();
 
-      if (isGoogleMapActive) renderGoogleMarkers();
+      if (isNaverMapActive) renderNaverMarkers();
+      else if (isGoogleMapActive) renderGoogleMarkers();
       else renderLeafletMarkers();
 
       selectStore(newStore);
@@ -791,14 +884,33 @@
       elSettingsModal.classList.add('hidden');
     });
 
+    // 네이버 지도 Client ID 저장 및 새로고침
+    const btnSaveNaverKey = document.getElementById('btn-save-naver-key');
+    if (btnSaveNaverKey) {
+      btnSaveNaverKey.addEventListener('click', () => {
+        const key = document.getElementById('setting-naver-key')?.value.trim();
+        if (key) {
+          localStorage.setItem(STORAGE_KEYS.NAVER_KEY, key);
+          elSettingsModal.classList.add('hidden');
+          showToast('네이버 지도 키가 저장되었습니다. 지도를 로드합니다!', '🗺️');
+          initMap();
+        } else {
+          showToast('Client ID를 입력해주세요.', '⚠️');
+        }
+      });
+    }
+
     // 구글맵 API 키 저장 및 새로고침
-    document.getElementById('btn-save-gmap-key').addEventListener('click', () => {
-      const key = elSettingGmapApiKey.value.trim();
-      localStorage.setItem(STORAGE_KEYS.GMAP_KEY, key);
-      elSettingsModal.classList.add('hidden');
-      showToast('설정이 저장되었습니다. 지도를 새로고침합니다.', '⚙️');
-      initMap();
-    });
+    const btnSaveGmapKey = document.getElementById('btn-save-gmap-key');
+    if (btnSaveGmapKey) {
+      btnSaveGmapKey.addEventListener('click', () => {
+        const key = elSettingGmapApiKey.value.trim();
+        localStorage.setItem(STORAGE_KEYS.GMAP_KEY, key);
+        elSettingsModal.classList.add('hidden');
+        showToast('설정이 저장되었습니다. 지도를 새로고침합니다.', '⚙️');
+        initMap();
+      });
+    }
 
     // 데이터 백업 및 복원
     document.getElementById('btn-backup-data').addEventListener('click', () => {
