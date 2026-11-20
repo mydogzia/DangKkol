@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>전국당꼴 - 당구 꼴찌 기록기</title>
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  
+  <!-- FontAwesome Icons & Google Fonts -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS for offline/keyless map fallback -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+  <div id="app-container">
+    <!-- 상단 헤더 바 -->
+    <header class="app-header">
+      <div class="header-left">
+        <img src="icon.png" class="logo-icon-img" alt="당꼴 캐릭터">
+        <h1 class="logo-title">전국당꼴</h1>
+        <span class="badge-sub">당구 꼴찌 기록기</span>
+      </div>
+      <div class="header-actions">
+        <button id="btn-search-toggle" class="icon-btn" title="당구장 검색">
+          <i class="fa-solid fa-magnifying-glass"></i>
+        </button>
+        <button id="btn-settings" class="icon-btn" title="설정 / 구글맵 API 키">
+          <i class="fa-solid fa-gear"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- 검색창 오버레이 (숨김 가능) -->
+    <div id="search-bar" class="search-bar hidden">
+      <div class="search-input-wrap">
+        <i class="fa-solid fa-location-dot"></i>
+        <input type="text" id="search-input" placeholder="당구장 이름 또는 지역 검색 (예: 강남, 에이스당구장)...">
+        <button id="btn-search-clear" class="btn-clear hidden"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="search-results" class="search-results hidden"></div>
+    </div>
+
+    <!-- 지도 안내 배너 -->
+    <div id="api-key-banner" class="api-key-banner">
+      <div class="banner-content">
+        <i class="fa-solid fa-map-location-dot text-emerald-400"></i>
+        <span>당구장 선택 모드: <strong>가게를 터치하면 꼴찌 등록이 열립니다!</strong></span>
+      </div>
+      <button id="btn-banner-settings" class="banner-btn">설정</button>
+    </div>
+
+    <!-- 메인 컨텐츠 영역 -->
+    <main class="main-content">
+      <!-- 1. 지도 뷰 (기본) -->
+      <section id="view-map" class="view-section active">
+        <!-- 지도 컨테이너 -->
+        <div id="map-container" class="map-container">
+          <!-- 실제 지도 element (Google Maps or Leaflet) -->
+          <div id="map"></div>
+        </div>
+
+        <!-- 상단 당구장 추가 버튼 -->
+        <div class="map-controls">
+          <button id="btn-add-store-manual" class="fab-btn fab-add" title="새 당구장 직접 등록">
+            <i class="fa-solid fa-plus"></i>
+            <span>당구장 추가</span>
+          </button>
+        </div>
+
+        <!-- 항상 화면에 고정 표시되는 내 위치(GPS) 플로팅 버튼 -->
+        <button id="btn-my-location" class="fab-my-location" title="내 위치로 이동">
+          <i class="fa-solid fa-crosshairs"></i>
+        </button>
+
+        <!-- 선택된 당구장 바텀 시트 (가게 터치 시 올라옴) -->
+        <div id="store-bottom-sheet" class="bottom-sheet collapsed">
+          <div class="sheet-handle" id="sheet-handle"></div>
+          <div class="sheet-content">
+            <div class="sheet-header">
+              <div class="store-badge-row">
+                <span class="category-badge">🎱 당구장</span>
+                <span id="sheet-record-count" class="count-badge">경기 0회</span>
+              </div>
+              <h2 id="sheet-store-name" class="sheet-store-title">선택된 당구장</h2>
+              <p id="sheet-store-address" class="sheet-store-address">주소 정보가 없습니다</p>
+            </div>
+
+            <!-- 이 당구장의 꼴찌 요약 카드 -->
+            <div class="store-loser-summary">
+              <div class="summary-box">
+                <span class="summary-label">이 당구장 최다 꼴찌</span>
+                <span id="sheet-top-loser" class="summary-value loser-highlight">기록 없음</span>
+              </div>
+              <div class="summary-box">
+                <span class="summary-label">누적 지출 게임비</span>
+                <span id="sheet-total-fee" class="summary-value fee-highlight">0원</span>
+              </div>
+            </div>
+
+            <!-- 액션 버튼들 -->
+            <div class="sheet-actions">
+              <button id="btn-open-record-modal" class="btn-primary-action">
+                <i class="fa-solid fa-skull-crossbones"></i>
+                <span>오늘의 꼴찌 등록하기</span>
+              </button>
+              <button id="btn-view-store-history" class="btn-secondary-action">
+                <i class="fa-solid fa-list-ul"></i>
+                <span>전적 보기</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. 랭킹 & 통계 뷰 -->
+      <section id="view-ranking" class="view-section">
+        <div class="ranking-header">
+          <h2>🏆 전국 꼴찌 명예의 전당</h2>
+          <p>누가 가장 많이 졌고, 누가 게임비를 제일 많이 냈을까요?</p>
+        </div>
+
+        <!-- 탭 전환: 꼴찌 횟수 랭킹 vs 지갑 털린 랭킹 -->
+        <div class="ranking-tabs">
+          <button class="rank-tab-btn active" data-tab="loser-count">
+            <i class="fa-solid fa-skull"></i> 최다 꼴찌 순위
+          </button>
+          <button class="rank-tab-btn" data-tab="money-spent">
+            <i class="fa-solid fa-money-bill-wave"></i> 지갑 털린 순위
+          </button>
+        </div>
+
+        <!-- 랭킹 리스트 컨테이너 -->
+        <div id="ranking-list" class="ranking-list">
+          <!-- 동적 렌더링 -->
+        </div>
+
+        <!-- 당구장별 징크스 분석 카드 -->
+        <div class="store-stats-card">
+          <h3 class="card-title"><i class="fa-solid fa-map-pin"></i> 당구장별 단골 꼴찌</h3>
+          <div id="store-stats-list" class="store-stats-list">
+            <!-- 동적 렌더링 -->
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. 경기 히스토리 뷰 -->
+      <section id="view-history" class="view-section">
+        <div class="history-header">
+          <div class="history-title-row">
+            <h2>📜 전체 경기 기록</h2>
+            <button id="btn-export-share" class="btn-share-all" title="기록 공유하기">
+              <i class="fa-solid fa-share-nodes"></i> 공유
+            </button>
+          </div>
+          <p>등록된 모든 당구 대결의 꼴찌 히스토리입니다.</p>
+        </div>
+
+        <div id="history-list" class="history-list">
+          <!-- 동적 렌더링 -->
+        </div>
+      </section>
+    </main>
+
+    <!-- 하단 네비게이션 탭 바 -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-target="view-map">
+        <i class="fa-solid fa-map-location-dot"></i>
+        <span>지도</span>
+      </button>
+      <button class="nav-item" data-target="view-ranking">
+        <i class="fa-solid fa-trophy"></i>
+        <span>꼴찌 랭킹</span>
+      </button>
+      <button class="nav-item" data-target="view-history">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <span>경기 기록</span>
+      </button>
+    </nav>
+
+    <!-- 모달: 꼴찌 등록 모달 -->
+    <div id="record-modal" class="modal-overlay hidden">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <span class="modal-emoji">💀</span>
+            <div>
+              <h3>오늘의 꼴찌 등록</h3>
+              <p id="modal-store-name" class="modal-sub">선택된 당구장</p>
+            </div>
+          </div>
+          <button id="btn-close-record-modal" class="modal-close-btn">&times;</button>
+        </div>
+
+        <form id="record-form" class="modal-body">
+          <input type="hidden" id="record-store-id">
+          <input type="hidden" id="record-store-name-val">
+          <input type="hidden" id="record-store-address-val">
+
+          <!-- 경기 날짜 -->
+          <div class="form-group">
+            <label for="record-date"><i class="fa-regular fa-calendar"></i> 경기 일시</label>
+            <input type="datetime-local" id="record-date" required>
+          </div>
+
+          <!-- 게임 종목 -->
+          <div class="form-group">
+            <label><i class="fa-solid fa-circle-notch"></i> 게임 종목</label>
+            <div class="game-type-chips">
+              <label class="chip">
+                <input type="radio" name="game-type" value="4구" checked>
+                <span>4구</span>
+              </label>
+              <label class="chip">
+                <input type="radio" name="game-type" value="3구(중대)">
+                <span>3구(중대)</span>
+              </label>
+              <label class="chip">
+                <input type="radio" name="game-type" value="3구(대대)">
+                <span>3구(대대)</span>
+              </label>
+              <label class="chip">
+                <input type="radio" name="game-type" value="포켓볼">
+                <span>포켓볼</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 오늘의 꼴찌 (패배자) -->
+          <div class="form-group">
+            <label for="record-loser"><i class="fa-solid fa-user-xmark text-red-500"></i> 패배자 (오늘의 꼴찌) *</label>
+            <input type="text" id="record-loser" placeholder="꼴찌 이름 또는 별명 입력" required autocomplete="off">
+            <div id="quick-players" class="quick-tags"></div>
+          </div>
+
+          <!-- 1등 (승자) - 선택 -->
+          <div class="form-group">
+            <label for="record-winner"><i class="fa-solid fa-crown text-yellow-400"></i> 1등 (승리자 / 선택)</label>
+            <input type="text" id="record-winner" placeholder="승리자 이름 (선택사항)" autocomplete="off">
+          </div>
+
+          <!-- 낸 게임비 -->
+          <div class="form-group">
+            <label for="record-fee"><i class="fa-solid fa-won-sign text-emerald-400"></i> 꼴찌가 결제한 금액</label>
+            <div class="fee-input-wrap">
+              <input type="number" id="record-fee" placeholder="15000" step="1000" min="0">
+              <span class="unit">원</span>
+            </div>
+            <div class="quick-fee-chips">
+              <button type="button" class="btn-fee-chip" data-amount="10000">1만</button>
+              <button type="button" class="btn-fee-chip" data-amount="15000">1.5만</button>
+              <button type="button" class="btn-fee-chip" data-amount="20000">2만</button>
+              <button type="button" class="btn-fee-chip" data-amount="30000">3만</button>
+            </div>
+          </div>
+
+          <!-- 패배자의 변명 / 메모 -->
+          <div class="form-group">
+            <label for="record-excuse"><i class="fa-solid fa-comment-dots"></i> 패배자의 한마디 / 변명</label>
+            <input type="text" id="record-excuse" placeholder="예: 오늘 큐대가 휨, 삑사리 5번...">
+            <div class="quick-excuse-chips">
+              <button type="button" class="btn-excuse-chip">큐대 탓</button>
+              <button type="button" class="btn-excuse-chip">초크 안 칠함</button>
+              <button type="button" class="btn-excuse-chip">쿠션이 안 먹힘</button>
+              <button type="button" class="btn-excuse-chip">운이 안 따름</button>
+              <button type="button" class="btn-excuse-chip">깔끔하게 인정</button>
+            </div>
+          </div>
+
+          <!-- 저장 버튼 -->
+          <div class="modal-footer">
+            <button type="button" id="btn-cancel-record" class="btn-cancel">취소</button>
+            <button type="submit" class="btn-submit">
+              <i class="fa-solid fa-check"></i> 꼴찌 박제하기 (저장)
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 모달: 수동 당구장 추가 모달 -->
+    <div id="add-store-modal" class="modal-overlay hidden">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <span class="modal-emoji">📍</span>
+            <div>
+              <h3>새 당구장 등록</h3>
+              <p class="modal-sub">지도에 당구장을 직접 추가합니다</p>
+            </div>
+          </div>
+          <button id="btn-close-store-modal" class="modal-close-btn">&times;</button>
+        </div>
+        <form id="add-store-form" class="modal-body">
+          <div class="form-group">
+            <label for="new-store-name">당구장 이름 *</label>
+            <input type="text" id="new-store-name" placeholder="예: 강남 에이스당구클럽" required>
+          </div>
+          <div class="form-group">
+            <label for="new-store-address">주소 또는 위치 설명</label>
+            <input type="text" id="new-store-address" placeholder="예: 서울 강남구 테헤란로 123 3층">
+          </div>
+          <div class="form-group">
+            <label for="new-store-memo">특징 / 비고</label>
+            <input type="text" id="new-store-memo" placeholder="예: 대대 6대, 중대 4대 구비">
+          </div>
+          <div class="modal-footer">
+            <button type="button" id="btn-cancel-add-store" class="btn-cancel">취소</button>
+            <button type="submit" class="btn-submit">당구장 추가하기</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 모달: 설정 & 구글맵 API 키 입력 -->
+    <div id="settings-modal" class="modal-overlay hidden">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <span class="modal-emoji">⚙️</span>
+            <div>
+              <h3>앱 설정 & 구글맵 연동</h3>
+              <p class="modal-sub">Google Maps API 키 설정 및 데이터 관리</p>
+            </div>
+          </div>
+          <button id="btn-close-settings-modal" class="modal-close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <!-- 지도 엔진 선택 -->
+          <div class="form-group">
+            <label><i class="fa-solid fa-layer-group text-primary"></i> 지도 종류 선택</label>
+            <div class="game-type-chips">
+              <label class="chip">
+                <input type="radio" name="map-provider" value="leaflet" checked>
+                <span>일반 고화질 (추천 ⭐)</span>
+              </label>
+              <label class="chip">
+                <input type="radio" name="map-provider" value="naver">
+                <span>네이버 지도</span>
+              </label>
+            </div>
+            <p class="input-helper">
+              * <strong>일반 고화질</strong>: 키 인증 오류 없이 스마트폰에서 100% 바로 작동합니다.<br>
+              * <strong>네이버 지도</strong>: 네이버 클라우드 웹 인증이 승인된 환경에서 작동합니다.
+            </p>
+          </div>
+
+          <div class="form-group" id="naver-key-group">
+            <label for="setting-naver-key">
+              <i class="fa-solid fa-map-marked-alt text-emerald-400"></i> 네이버 지도 Client ID
+            </label>
+            <input type="text" id="setting-naver-key" value="shr1k32iat" placeholder="네이버 클라우드 Client ID 입력">
+          </div>
+
+          <div class="form-group">
+            <button id="btn-save-naver-key" class="btn-submit w-full">선택한 지도로 적용하기</button>
+          </div>
+
+          <hr class="modal-divider">
+
+          <div class="form-group">
+            <label><i class="fa-solid fa-database"></i> 데이터 관리</label>
+            <div class="data-actions-row">
+              <button id="btn-backup-data" class="btn-data-action">
+                <i class="fa-solid fa-download"></i> 백업 파일 저장
+              </button>
+              <button id="btn-restore-data-trigger" class="btn-data-action">
+                <i class="fa-solid fa-upload"></i> 백업 복원
+              </button>
+              <input type="file" id="input-restore-file" accept=".json" class="hidden">
+            </div>
+            <button id="btn-reset-demo" class="btn-data-danger mt-2">
+              <i class="fa-solid fa-rotate-right"></i> 샘플 데이터 다시 채우기
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 꼴찌 등록 완료 팝업 알림 (토스트) -->
+    <div id="toast" class="toast hidden">
+      <div class="toast-icon">🎱</div>
+      <div class="toast-message" id="toast-message">오늘의 꼴찌가 등록되었습니다!</div>
+    </div>
+
+  </div>
+
+  <!-- Leaflet JS (Google Maps 미입력 상태에서도 아름답게 작동하는 모바일 지도) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- App Script -->
+  <script src="app.js?v=2"></script>
+</body>
+</html>
