@@ -47,6 +47,7 @@
   let isGoogleMapActive = false;
   let naverMapInstance = null;
   let isNaverMapActive = false;
+  let userLocationMarker = null;
 
   // DOM Elements
   const elMap = document.getElementById('map');
@@ -462,8 +463,27 @@
       googleMapInstance.setCenter(userLocation);
       googleMapInstance.setZoom(15);
     } else if (currentMap) {
-      currentMap.setView([userLocation.lat, userLocation.lng], 15);
+      currentMap.setView([userLocation.lat, userLocation.lng], 16);
+      renderUserLocationMarker();
     }
+  }
+
+  function renderUserLocationMarker() {
+    if (!currentMap) return;
+    if (userLocationMarker) {
+      currentMap.removeLayer(userLocationMarker);
+      userLocationMarker = null;
+    }
+    const radarIcon = L.divIcon({
+      className: 'user-radar-container',
+      html: '<div class="user-radar-dot"></div>',
+      iconSize: [18, 18],
+      iconAnchor: [9, 9]
+    });
+    userLocationMarker = L.marker([userLocation.lat, userLocation.lng], {
+      icon: radarIcon,
+      zIndexOffset: 1200
+    }).addTo(currentMap);
   }
 
   // --- 꼴찌 등록 모달 처리 ---
@@ -825,8 +845,9 @@
       showToast(`새 당구장 '${storeName}'이(가) 등록되었습니다!`, '📍');
     });
 
-    // 내 위치 버튼
+    // 내 위치 버튼 클릭
     document.getElementById('btn-my-location').addEventListener('click', () => {
+      showToast('내 현재 위치를 찾는 중... 📍', '🎯');
       tryGetUserLocation();
       moveToCurrentLocation();
     });

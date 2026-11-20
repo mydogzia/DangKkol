@@ -71,6 +71,15 @@ body {
   gap: 10px;
 }
 
+.logo-icon-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  object-fit: cover;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
 .logo-ball {
   width: 32px;
   height: 32px;
@@ -287,12 +296,73 @@ body {
 
 .map-controls {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: 14px;
+  right: 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  z-index: 30;
+  z-index: 1000;
+  pointer-events: auto;
+  transform: translateZ(0);
+}
+
+/* 항상 화면 우측 하단에 떠있는 내 위치(GPS) 동그란 버튼 */
+.fab-my-location {
+  position: absolute;
+  bottom: 85px;
+  right: 16px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(10px);
+  border: 2px solid #38bdf8;
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 14px rgba(56, 189, 248, 0.45);
+  z-index: 1000;
+  pointer-events: auto;
+  transform: translateZ(0);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.fab-my-location:active {
+  transform: scale(0.9) translateZ(0);
+  background: #090e1a;
+  color: #fff;
+  border-color: #60a5fa;
+}
+
+/* 내 현재 위치 레이더 펄스 마커 */
+.user-radar-dot {
+  width: 18px;
+  height: 18px;
+  background: #0284c7;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(2, 132, 199, 0.8);
+  position: relative;
+}
+
+.user-radar-dot::after {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  border-radius: 50%;
+  border: 2px solid #38bdf8;
+  animation: radarPulse 1.8s infinite;
+}
+
+@keyframes radarPulse {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2.4); opacity: 0; }
 }
 
 .fab-btn {

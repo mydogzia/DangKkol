@@ -7,7 +7,8 @@
   <meta name="theme-color" content="#0f172a">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎱</text></svg>">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
   
   <!-- FontAwesome Icons & Google Fonts -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -25,7 +26,7 @@
     <!-- 상단 헤더 바 -->
     <header class="app-header">
       <div class="header-left">
-        <span class="logo-ball">8</span>
+        <img src="icon.png" class="logo-icon-img" alt="당꼴 캐릭터">
         <h1 class="logo-title">전국당꼴</h1>
         <span class="badge-sub">당구 꼴찌 기록기</span>
       </div>
@@ -68,16 +69,18 @@
           <div id="map"></div>
         </div>
 
-        <!-- 지도 플로팅 버튼들 -->
+        <!-- 상단 당구장 추가 버튼 -->
         <div class="map-controls">
-          <button id="btn-my-location" class="fab-btn" title="내 위치로 이동">
-            <i class="fa-solid fa-crosshairs"></i>
-          </button>
           <button id="btn-add-store-manual" class="fab-btn fab-add" title="새 당구장 직접 등록">
             <i class="fa-solid fa-plus"></i>
             <span>당구장 추가</span>
           </button>
         </div>
+
+        <!-- 항상 화면에 고정 표시되는 내 위치(GPS) 플로팅 버튼 -->
+        <button id="btn-my-location" class="fab-my-location" title="내 위치로 이동">
+          <i class="fa-solid fa-crosshairs"></i>
+        </button>
 
         <!-- 선택된 당구장 바텀 시트 (가게 터치 시 올라옴) -->
         <div id="store-bottom-sheet" class="bottom-sheet collapsed">
