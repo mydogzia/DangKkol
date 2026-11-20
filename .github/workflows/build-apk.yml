@@ -38,7 +38,50 @@ jobs:
         find . -name "style.css" -not -path "*/assets/*" -exec cp -f {} "$ASSETS_DIR/" \;
         find . -name "icon.png" -not -path "*/assets/*" -exec cp -f {} "$ASSETS_DIR/" \;
 
-        python3 -c "from PIL import Image; import glob, os; src = glob.glob('**/icon.png', recursive=True)[0] if glob.glob('**/icon.png', recursive=True) else None; [os.makedirs(os.path.join('$TARGET_DIR/app/src/main/res', f), exist_ok=True) or [Image.open(src).convert('RGBA').resize((sz, sz)).save(os.path.join('$TARGET_DIR/app/src/main/res', f, n), 'PNG') for n in ['ic_launcher.png', 'ic_launcher_round.png']] for f, sz in [('mipmap-mdpi',48),('mipmap-hdpi',72),('mipmap-xhdpi',96),('mipmap-xxhdpi',144),('mipmap-xxxhdpi',192),('drawable',512)]] if src else print('no icon')" || true
+        RES_DIR="$TARGET_DIR/app/src/main/res"
+        ICON_SRC=$(find . -name "icon.png" -not -path "*/assets/*" -not -path "*/res/*" | head -n 1)
+
+        # 1. Pillow 라이브러리 자동 설치
+        python3 -m pip install pillow --break-system-packages 2>/dev/null || python3 -m pip install pillow 2>/dev/null || true
+
+        # 2. 스마트폰 앱 아이콘 해상도별 생성 스크립트
+        cat << 'EOF' > generate_icons.py
+import sys, os
+try:
+    from PIL import Image
+    src = sys.argv[1]
+    res_dir = sys.argv[2]
+    img = Image.open(src).convert('RGBA')
+    sizes = {
+        'mipmap-mdpi': 48,
+        'mipmap-hdpi': 72,
+        'mipmap-xhdpi': 96,
+        'mipmap-xxhdpi': 144,
+        'mipmap-xxxhdpi': 192,
+        'drawable': 512
+    }
+    for folder, sz in sizes.items():
+        out_dir = os.path.join(res_dir, folder)
+        os.makedirs(out_dir, exist_ok=True)
+        resized = img.resize((sz, sz), Image.Resampling.LANCZOS)
+        resized.save(os.path.join(out_dir, 'ic_launcher.png'), 'PNG')
+        resized.save(os.path.join(out_dir, 'ic_launcher_round.png'), 'PNG')
+    print("성공: 아이콘이 해상도별로 정상 생성되었습니다.")
+except Exception as e:
+    print(f"아이콘 생성 에러: {e}")
+    sys.exit(1)
+EOF
+
+        if [ -n "$ICON_SRC" ]; then
+          python3 generate_icons.py "$ICON_SRC" "$RES_DIR" || (
+            echo "대체 모드: 아이콘 직접 복사"
+            for f in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi drawable; do
+              mkdir -p "$RES_DIR/$f"
+              cp -f "$ICON_SRC" "$RES_DIR/$f/ic_launcher.png"
+              cp -f "$ICON_SRC" "$RES_DIR/$f/ic_launcher_round.png"
+            done
+          )
+        fi
 
         MANIFEST="$TARGET_DIR/app/src/main/AndroidManifest.xml"
         if [ -f "$MANIFEST" ]; then
