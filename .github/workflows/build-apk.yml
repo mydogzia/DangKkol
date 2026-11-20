@@ -1,3 +1,4 @@
+
 name: Build Android APK (전국당꼴)
 
 on:
@@ -31,71 +32,110 @@ jobs:
         TARGET_DIR=$(find . -type d -name "android" | head -n 1)
         echo "안드로이드 폴더: $TARGET_DIR"
 
+        if [ -z "$TARGET_DIR" ]; then
+          echo "ERROR: android 폴더를 찾을 수 없습니다."
+          exit 1
+        fi
+
         ASSETS_DIR="$TARGET_DIR/app/src/main/assets"
         mkdir -p "$ASSETS_DIR"
+
         find . -name "index.html" -not -path "*/assets/*" -exec cp -f {} "$ASSETS_DIR/" \;
         find . -name "app.js" -not -path "*/assets/*" -exec cp -f {} "$ASSETS_DIR/" \;
         find . -name "style.css" -not -path "*/assets/*" -exec cp -f {} "$ASSETS_DIR/" \;
         find . -name "icon.png" -not -path "*/assets/*" -exec cp -f {} "$ASSETS_DIR/" \;
 
         RES_DIR="$TARGET_DIR/app/src/main/res"
+        mkdir -p "$RES_DIR"
+
         ICON_SRC=$(find . -name "icon.png" -not -path "*/assets/*" -not -path "*/res/*" | head -n 1)
 
         # 1. Pillow 라이브러리 자동 설치
         python3 -m pip install pillow --break-system-packages 2>/dev/null || python3 -m pip install pillow 2>/dev/null || true
 
         # 2. 스마트폰 앱 아이콘 해상도별 생성 스크립트
-        cat << 'EOF' > generate_icons.py
-import sys, os
-try:
-    from PIL import Image
-    src = sys.argv[1]
-    res_dir = sys.argv[2]
-    img = Image.open(src).convert('RGBA')
-    sizes = {
-        'mipmap-mdpi': 48,
-        'mipmap-hdpi': 72,
-        'mipmap-xhdpi': 96,
-        'mipmap-xxhdpi': 144,
-        'mipmap-xxxhdpi': 192,
-        'drawable': 512
-    }
-    for folder, sz in sizes.items():
-        out_dir = os.path.join(res_dir, folder)
-        os.makedirs(out_dir, exist_ok=True)
-        resized = img.resize((sz, sz), Image.Resampling.LANCZOS)
-        resized.save(os.path.join(out_dir, 'ic_launcher.png'), 'PNG')
-        resized.save(os.path.join(out_dir, 'ic_launcher_round.png'), 'PNG')
-    print("성공: 아이콘이 해상도별로 정상 생성되었습니다.")
-except Exception as e:
-    print(f"아이콘 생성 에러: {e}")
-    sys.exit(1)
-EOF
+        cat << 'PYEOF' > generate_icons.py
+        import sys
+        import os
 
+        try:
+            from PIL import Image
+
+            src = sys.argv[1]
+            res_dir = sys.argv[2]
+
+            img = Image.open(src).convert('RGBA')
+
+            sizes = {
+                'mipmap-mdpi': 48,
+                'mipmap-hdpi': 72,
+                'mipmap-xhdpi': 96,
+                'mipmap-xxhdpi': 144,
+                'mipmap-xxxhdpi': 192,
+                'drawable': 512
+            }
+
+            for folder, sz in sizes.items():
+                out_dir = os.path.join(res_dir, folder)
+                os.makedirs(out_dir, exist_ok=True)
+
+                resized = img.resize(
+                    (sz, sz),
+                    Image.Resampling.LANCZOS
+                )
+
+                resized.save(
+                    os.path.join(out_dir, 'ic_launcher.png'),
+                    'PNG'
+                )
+
+                resized.save(
+                    os.path.join(out_dir, 'ic_launcher_round.png'),
+                    'PNG'
+                )
+
+            print("성공: 아이콘이 해상도별로 정상 생성되었습니다.")
+
+        except Exception as e:
+            print(f"아이콘 생성 에러: {e}")
+            sys.exit(1)
+        PYEOF
+
+        # 3. 아이콘 생성
         if [ -n "$ICON_SRC" ]; then
           python3 generate_icons.py "$ICON_SRC" "$RES_DIR" || (
             echo "대체 모드: 아이콘 직접 복사"
+
             for f in mipmap-mdpi mipmap-hdpi mipmap-xhdpi mipmap-xxhdpi mipmap-xxxhdpi drawable; do
               mkdir -p "$RES_DIR/$f"
               cp -f "$ICON_SRC" "$RES_DIR/$f/ic_launcher.png"
               cp -f "$ICON_SRC" "$RES_DIR/$f/ic_launcher_round.png"
             done
           )
+        else
+          echo "WARNING: icon.png 파일을 찾을 수 없습니다."
         fi
 
+        # 4. AndroidManifest.xml 아이콘 설정
         MANIFEST="$TARGET_DIR/app/src/main/AndroidManifest.xml"
+
         if [ -f "$MANIFEST" ]; then
           sed -i 's/android:icon="[^"]*"/android:icon="@mipmap\/ic_launcher"/g' "$MANIFEST"
           sed -i 's/android:roundIcon="[^"]*"/android:roundIcon="@mipmap\/ic_launcher_round"/g' "$MANIFEST"
         fi
 
+        # 5. Gradle 설정
         cd "$TARGET_DIR"
+
         echo "android.useAndroidX=true" > gradle.properties
         echo "android.nonTransitiveRClass=true" >> gradle.properties
         echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
 
+        # 6. Gradle Wrapper 생성 및 APK 빌드
         gradle wrapper --gradle-version 8.5 --distribution-type bin
+
         chmod +x gradlew
+
         ./gradlew assembleDebug --stacktrace --no-daemon
 
     - name: Upload APK Artifact
