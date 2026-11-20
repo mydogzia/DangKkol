@@ -10,6 +10,7 @@
   const STORAGE_KEYS = {
     STORES: 'dangkkol_stores_v1',
     RECORDS: 'dangkkol_records_v1',
+    MAP_TYPE: 'dangkkol_map_type_v2',
     NAVER_KEY: 'dangkkol_naver_key_v1',
     GMAP_KEY: 'dangkkol_gmap_key_v1',
     PLAYERS: 'dangkkol_players_v1'
@@ -102,6 +103,10 @@
       const storedRecords = localStorage.getItem(STORAGE_KEYS.RECORDS);
       records = storedRecords ? JSON.parse(storedRecords) : [...DEFAULT_RECORDS];
 
+      const savedMapType = localStorage.getItem(STORAGE_KEYS.MAP_TYPE) || 'leaflet';
+      const radio = document.querySelector(`input[name="map-provider"][value="${savedMapType}"]`);
+      if (radio) radio.checked = true;
+
       const savedNaverKey = localStorage.getItem(STORAGE_KEYS.NAVER_KEY) || DEFAULT_NAVER_CLIENT_ID;
       const elSettingNaverKey = document.getElementById('setting-naver-key');
       if (savedNaverKey && elSettingNaverKey) {
@@ -137,15 +142,16 @@
     }, 2800);
   }
 
-  // --- 지도 초기화 (네이버 지도 기본 연동) ---
+  // --- 지도 초기화 ---
   function initMap() {
+    const mapType = localStorage.getItem(STORAGE_KEYS.MAP_TYPE) || 'leaflet';
     const naverKey = localStorage.getItem(STORAGE_KEYS.NAVER_KEY) || DEFAULT_NAVER_CLIENT_ID;
-    const gmapKey = localStorage.getItem(STORAGE_KEYS.GMAP_KEY);
 
-    if (naverKey && naverKey.trim().length > 3) {
+    // file:// 로컬 환경(PC 더블클릭, 안드로이드 기본 파일)에서는 네이버 도메인 검증이 차단되므로 안정적인 고화질 지도를 우선 로드
+    const isFileProtocol = window.location.protocol === 'file:';
+
+    if (mapType === 'naver' && !isFileProtocol && naverKey && naverKey.trim().length > 3) {
       loadNaverMapsAPI(naverKey.trim());
-    } else if (gmapKey && gmapKey.trim().length > 15) {
-      loadGoogleMapsAPI(gmapKey.trim());
     } else {
       loadLeafletMap();
     }
@@ -303,10 +309,12 @@
   // 2. Leaflet Fallback 지도 (키 없이도 100% 동작 & 모바일 최적화)
   function loadLeafletMap() {
     isGoogleMapActive = false;
+    isNaverMapActive = false;
     elMap.innerHTML = '';
 
     if (currentMap) {
       currentMap.remove();
+      currentMap = null;
     }
 
     currentMap = L.map('map', {
@@ -315,10 +323,11 @@
       zoomControl: false
     });
 
-    // 어두운 빌리어드 테마 타일 레이어
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; OpenStreetMap & CartoDB',
-      maxZoom: 19
+    // 구글 지도 고화질 타일 레이어 (차단 없음, 403 에러 없음, 완벽한 한글 지도)
+    L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+      subdomains: ['0', '1', '2', '3'],
+      maxZoom: 20,
+      attribution: '&copy; Google'
     }).addTo(currentMap);
 
     // 지도 클릭 시 새 당구장 추가
@@ -327,6 +336,13 @@
     });
 
     renderLeafletMarkers();
+
+    // 화면 렌더링 후 크기 재계산 (빈 화면 방지)
+    setTimeout(() => {
+      if (currentMap) {
+        currentMap.invalidateSize();
+      }
+    }, 200);
   }
 
   function renderLeafletMarkers() {
@@ -884,19 +900,21 @@
       elSettingsModal.classList.add('hidden');
     });
 
-    // 네이버 지도 Client ID 저장 및 새로고침
+    // 지도 종류 및 네이버 키 저장
     const btnSaveNaverKey = document.getElementById('btn-save-naver-key');
     if (btnSaveNaverKey) {
       btnSaveNaverKey.addEventListener('click', () => {
+        const selectedProvider = document.querySelector('input[name="map-provider"]:checked')?.value || 'leaflet';
+        localStorage.setItem(STORAGE_KEYS.MAP_TYPE, selectedProvider);
+
         const key = document.getElementById('setting-naver-key')?.value.trim();
         if (key) {
           localStorage.setItem(STORAGE_KEYS.NAVER_KEY, key);
-          elSettingsModal.classList.add('hidden');
-          showToast('네이버 지도 키가 저장되었습니다. 지도를 로드합니다!', '🗺️');
-          initMap();
-        } else {
-          showToast('Client ID를 입력해주세요.', '⚠️');
         }
+
+        elSettingsModal.classList.add('hidden');
+        showToast(`지도를 [${selectedProvider === 'naver' ? '네이버 지도' : '일반 고화질'}]로 전환합니다!`, '🗺️');
+        initMap();
       });
     }
 
