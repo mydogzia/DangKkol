@@ -24,15 +24,13 @@ jobs:
         gradle-version: '8.5'
 
     - name: Accept Android Licenses
-      run: |
-        yes | sdkmanager --licenses || true
+      run: yes | sdkmanager --licenses || true
 
     - name: Build APK with Gradle 8.5
       run: |
         TARGET_DIR=$(find . -type d -name "android" | head -n 1)
         echo "안드로이드 폴더: $TARGET_DIR"
 
-        # 1. 방금 올리신 최신 웹 파일들을 안드로이드 안쪽 폴더로 강제 복사
         ASSETS_DIR="$TARGET_DIR/app/src/main/assets"
         mkdir -p "$ASSETS_DIR"
         find . -name "index.html" -not -path "*/assets/*" -exec cp -f {} "$ASSETS_DIR/" \;
@@ -40,37 +38,8 @@ jobs:
         find . -name "style.css" -not -path "*/assets/*" -exec cp -f {} "$ASSETS_DIR/" \;
         find . -name "icon.png" -not -path "*/assets/*" -exec cp -f {} "$ASSETS_DIR/" \;
 
-        # 2. 방금 올리신 우는 캐릭터(icon.png)로 스마트폰 앱 아이콘 자동 생성
-        python3 -c "
-from PIL import Image
-import os, glob
+        python3 -c "from PIL import Image; import glob, os; src = glob.glob('**/icon.png', recursive=True)[0] if glob.glob('**/icon.png', recursive=True) else None; [os.makedirs(os.path.join('$TARGET_DIR/app/src/main/res', f), exist_ok=True) or [Image.open(src).convert('RGBA').resize((sz, sz)).save(os.path.join('$TARGET_DIR/app/src/main/res', f, n), 'PNG') for n in ['ic_launcher.png', 'ic_launcher_round.png']] for f, sz in [('mipmap-mdpi',48),('mipmap-hdpi',72),('mipmap-xhdpi',96),('mipmap-xxhdpi',144),('mipmap-xxxhdpi',192),('drawable',512)]] if src else print('no icon')" || true
 
-icons = glob.glob('**/icon.png', recursive=True)
-if icons:
-    src = icons[0]
-    print('아이콘 발견:', src)
-    img = Image.open(src).convert('RGBA')
-    res_base = '$TARGET_DIR/app/src/main/res'
-    sizes = {
-        'mipmap-mdpi': 48,
-        'mipmap-hdpi': 72,
-        'mipmap-xhdpi': 96,
-        'mipmap-xxhdpi': 144,
-        'mipmap-xxxhdpi': 192,
-        'drawable': 512
-    }
-    for folder, sz in sizes.items():
-        out_dir = os.path.join(res_base, folder)
-        os.makedirs(out_dir, exist_ok=True)
-        resized = img.resize((sz, sz), Image.Resampling.LANCZOS)
-        resized.save(os.path.join(out_dir, 'ic_launcher.png'), 'PNG')
-        resized.save(os.path.join(out_dir, 'ic_launcher_round.png'), 'PNG')
-    print('스마트폰 앱 아이콘 적용 완료!')
-else:
-    print('icon.png 를 찾지 못함')
-" || true
-
-        # 3. 앱 아이콘 연결
         MANIFEST="$TARGET_DIR/app/src/main/AndroidManifest.xml"
         if [ -f "$MANIFEST" ]; then
           sed -i 's/android:icon="[^"]*"/android:icon="@mipmap\/ic_launcher"/g' "$MANIFEST"
@@ -78,8 +47,6 @@ else:
         fi
 
         cd "$TARGET_DIR"
-
-        # 4. AndroidX 설정 자동 주입
         echo "android.useAndroidX=true" > gradle.properties
         echo "android.nonTransitiveRClass=true" >> gradle.properties
         echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" >> gradle.properties
